@@ -7,7 +7,7 @@
         "Properties": {
           "InstanceType": "t2.micro",
           "ImageId": "ami-0ba62214afa52bec7",
-          "KeyName": "flask-app-keypair",
+          "KeyName": "ansible-key",
           "SecurityGroupIds": [
             { "Fn::GetAtt": ["FlaskSecurityGroup", "GroupId"] }
           ],
