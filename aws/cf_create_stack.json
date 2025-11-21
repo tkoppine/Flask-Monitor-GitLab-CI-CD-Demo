@@ -1,47 +1,130 @@
 {
-    "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "Simple EC2 to run Docker image from Docker Hub",
-    "Resources": {
-      "FlaskEC2Instance": {
-        "Type": "AWS::EC2::Instance",
-        "Properties": {
-          "InstanceType": "t2.micro",
-          "ImageId": "ami-0ba62214afa52bec7",
-          "KeyName": "ansible-key",
-          "SecurityGroupIds": [
-            { "Fn::GetAtt": ["FlaskSecurityGroup", "GroupId"] }
-          ],
-          "UserData": {
-            "Fn::Base64": {
-              "Fn::Join": [
-                "",
-                [
-                  "#!/bin/bash\n",
-                  "apt-get update -y\n",
-                  "apt-get install -y docker.io\n",
-                  "systemctl start docker\n",
-                  "systemctl enable docker\n",
-                  "docker pull tkoppine/demo-app1:python-app-1.0\n",
-                  "docker run -d --name flaskapp -p 80:5000 tkoppine/demo-app1:python-app-1.0\n"
-                ]
-              ]
-            }
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "EC2 instance running Docker container on Amazon Linux 2023 with CloudWatch Logs",
+  "Resources": {
+    "FlaskSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow SSH and HTTP inbound traffic",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0"
           }
-        }
-      },
-      "FlaskSecurityGroup": {
-        "Type": "AWS::EC2::SecurityGroup",
-        "Properties": {
-          "GroupDescription": "Allow HTTP",
-          "SecurityGroupIngress": [
+        ]
+      }
+    },
+
+    "FlaskEC2Role": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
             {
-              "IpProtocol": "tcp",
-              "FromPort": 80,
-              "ToPort": 80,
-              "CidrIp": "0.0.0.0/0"
+              "Effect": "Allow",
+              "Principal": { "Service": "ec2.amazonaws.com" },
+              "Action": "sts:AssumeRole"
             }
           ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+        ]
+      }
+    },
+
+    "FlaskInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          { "Ref": "FlaskEC2Role" }
+        ]
+      }
+    },
+
+    "FlaskEC2Instance": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "InstanceType": "t2.micro",
+        "ImageId": "ami-025ca978d4c1d9825",
+        "KeyName": "ansible-key",
+        "IamInstanceProfile": { "Ref": "FlaskInstanceProfile" },
+        "SecurityGroupIds": [ { "Fn::GetAtt": ["FlaskSecurityGroup", "GroupId"] } ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash\n",
+                "dnf update -y\n",
+
+                "# Install CloudWatch Agent\n",
+                "dnf install -y amazon-cloudwatch-agent\n",
+
+                "# Create CloudWatch Agent config\n",
+                "cat << 'EOF' > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json\n",
+                "{\n",
+                "  \"logs\": {\n",
+                "    \"logs_collected\": {\n",
+                "      \"files\": {\n",
+                "        \"collect_list\": [\n",
+                "          {\n",
+                "            \"file_path\": \"/var/log/messages\",\n",
+                "            \"log_group_name\": \"/ec2/flaskapp/system\",\n",
+                "            \"log_stream_name\": \"{instance_id}\"\n",
+                "          },\n",
+                "          {\n",
+                "            \"file_path\": \"/var/log/cloud-init-output.log\",\n",
+                "            \"log_group_name\": \"/ec2/flaskapp/cloudinit\",\n",
+                "            \"log_stream_name\": \"{instance_id}\"\n",
+                "          },\n",
+                "          {\n",
+                "            \"file_path\": \"/var/lib/docker/containers/*/*.log\",\n",
+                "            \"log_group_name\": \"/ec2/flaskapp/docker\",\n",
+                "            \"log_stream_name\": \"{instance_id}\"\n",
+                "          }\n",
+                "        ]\n",
+                "      }\n",
+                "    }\n",
+                "  }\n",
+                "}\n",
+                "EOF\n",
+
+                "# Start CloudWatch Agent\n",
+                "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \\\n",
+                "  -a fetch-config \\\n",
+                "  -m ec2 \\\n",
+                "  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \\\n",
+                "  -s\n",
+
+                "# Install Docker\n",
+                "dnf install -y docker\n",
+                "systemctl enable docker\n",
+                "systemctl start docker\n",
+
+                "# Run your Docker app\n",
+                "docker pull tkoppine/demo-app1:python-app-1.0\n",
+                "docker run -d --name flaskapp -p 80:5000 tkoppine/demo-app1:python-app-1.0\n"
+              ]
+            ]
+          }
         }
       }
     }
+  },
+  "Outputs": {
+    "InstancePublicIP": {
+      "Description": "Public IP of the EC2 instance",
+      "Value": { "Fn::GetAtt": ["FlaskEC2Instance", "PublicIp"] }
+    }
   }
+}
