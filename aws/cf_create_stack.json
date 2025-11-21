@@ -6,7 +6,7 @@
         "Type": "AWS::EC2::Instance",
         "Properties": {
           "InstanceType": "t2.micro",
-          "ImageId": "ami-0cf10cdf9fcd62d37",
+          "ImageId": "ami-0ba62214afa52bec7",
           "KeyName": "flask-app-keypair",
           "SecurityGroupIds": [
             { "Fn::GetAtt": ["FlaskSecurityGroup", "GroupId"] }
