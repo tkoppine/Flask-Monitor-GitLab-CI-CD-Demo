@@ -34,4 +34,6 @@ deploy:
   only:
     - main
   script:
+    - aws cloudformation delete-stack --stack-name FlaskAppStack --region us-east-2 || true
+    - aws cloudformation wait stack-delete-complete --stack-name FlaskAppStack --region us-east-2 || true
     - aws cloudformation deploy --template-file aws/cf_create_stack.json --stack-name FlaskAppStack --region us-east-2
