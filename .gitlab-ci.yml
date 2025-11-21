@@ -1,8 +1,6 @@
 variables:
     IMAGE_NAME: tkoppine/demo-app1
     IMAGE_TAG: python-app-1.0
-    CI_AWS_CFN_STACK_NAME: "FlaskAppStack"
-    CI_AWS_CFN_TEMPLATE_FILE: aws/cf_create_stack.json
 
 stages:
     - test
@@ -31,11 +29,12 @@ build_image:
         - docker push $IMAGE_NAME:$IMAGE_TAG
 
 deploy:
-    stage: deploy
-    only:
-        - main
-    script:
-        - echo "CloudFormation deploy handled automatically by included template"
-
-include:
-    - template: AWS/CF-Provision.gitlab-ci.yml
+  stage: deploy
+  image: amazon/aws-cli
+  only:
+    - main
+  script:
+    - aws cloudformation deploy \
+        --template-file aws/cf_create_stack.json \
+        --stack-name FlaskAppStack \
+        --region us-east-2
