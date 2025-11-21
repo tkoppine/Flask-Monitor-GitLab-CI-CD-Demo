@@ -34,7 +34,4 @@ deploy:
   only:
     - main
   script:
-    - aws cloudformation deploy \
-        --template-file aws/cf_create_stack.json \
-        --stack-name FlaskAppStack \
-        --region us-east-2
+    - aws cloudformation deploy --template-file aws/cf_create_stack.json --stack-name FlaskAppStack --region us-east-2
