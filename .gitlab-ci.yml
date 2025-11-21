@@ -2,14 +2,20 @@ variables:
     IMAGE_NAME: tkoppine/demo-app1
     IMAGE_TAG: python-app-1.0
 
+stages:
+    - test
+    - build
+
 run_tests:
-  image: python:3.12.0
-  before_script:
-    - apt-get update && apt-get install -y make
-  script:
-    - make test
+    stage: test
+    image: python:3.12.0
+    before_script:
+        - apt-get update && apt-get install -y make
+    script:
+        - make test
 
 build_image:
+    stage: build
     image: docker:29.0.2-cli
     services:
         - docker:29.0.2-dind
